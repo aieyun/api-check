@@ -199,15 +199,15 @@
                 </a>
               </a-tooltip>
               <a-tooltip :title="!testingComplete ? t('PLEASE_WAIT_FOR_TESTING') : t('SHARE')" placement="bottom">
-                <a-button
+                <a
                     @click="goShare"
                     class="icon-button"
-                    :disabled="!testingComplete"
-                    type="text"
-                    icon>
+                    :class="{ 'disabled-icon': !testingComplete }"
+                >
                   <ShareAltOutlined/>
-                </a-button>
+                </a>
               </a-tooltip>
+
 
               <a-dropdown trigger="click">
                 <template #overlay>
@@ -727,7 +727,7 @@ import * as echarts from 'echarts/core';
 import {RadarChart} from 'echarts/charts';
 import {CanvasRenderer} from 'echarts/renderers';
 
-import {initializeTheme, initializeLanguage} from '../utils/initialization.js';
+import {initializeTheme, initializeLanguage, initConsole} from '../utils/initialization.js';
 import {fetchModelList, fetchQuotaInfo, testModelList} from '../utils/api.js';
 import {errorHandler, maskApiKey, isClaude, isGpt, calculateSummaryData} from '../utils/normal.js';
 import {checkForUpdates} from '../utils/update.js';
@@ -872,6 +872,7 @@ function handleFunctionCallingCancel() {
 onMounted(() => {
   initializeTheme(isDarkMode);
   initializeLanguage(locale, currentLanguage);
+  initConsole();
   // 初始化本地缓存列表
   const savedLocalDataList = localStorage.getItem('localCacheList');
   if (savedLocalDataList) {
@@ -997,9 +998,10 @@ const showSettingsModal = () => {
 
 
 function showAnnouncement() {
-  const isOfficialSite = window.location.hostname === 'check.crond.dev';
+  const isOfficialSite = window.location.hostname === appInfo.website;
   const lang = currentLanguage.value;
   let descriptionNodes = [];
+
   descriptionNodes.push(
       h(
           'div',
@@ -1009,6 +1011,7 @@ function showAnnouncement() {
           `${appInfo.name} v${appInfo.version}`
       )
   );
+
   descriptionNodes.push(h('br'));
   descriptionNodes.push(
       h('div', [
@@ -1021,12 +1024,14 @@ function showAnnouncement() {
               target: '_blank',
               style: 'color: #1890ff;',
             },
-            appInfo.owner + "/" + appInfo.repo
+            `${appInfo.repo}`
         ),
       ])
   );
+
   descriptionNodes.push(h('div', t('STAR_PROJECT')));
   descriptionNodes.push(h('br'));
+
   descriptionNodes.push(
       h('div', [
         t('NEW_DOMAIN'),
@@ -1042,55 +1047,47 @@ function showAnnouncement() {
         ),
       ])
   );
+
   if (isOfficialSite) {
     descriptionNodes.push(h('br'));
     announcement.officialContent[lang].forEach((line) => {
       descriptionNodes.push(h('div', line));
     });
   }
+
   descriptionNodes.push(h('br'));
+
   descriptionNodes.push(h('div', {style: 'font-weight: bold;'}, t('HOW_TO_USE')));
   announcement.howToUse[lang].forEach((line) => {
     descriptionNodes.push(h('div', line));
   });
 
   descriptionNodes.push(h('br'));
-  const collapsePanels = [
-    h(
-        Collapse.Panel,
-        {header: t('VERSION_HISTORY'), key: '2'},
-        {
-          default: () => {
-            return announcement.updateLog[lang].map((log) =>
-                h('div', [
-                  h('strong', `${log.version} - ${log.date}`),
-                  h(
-                      'ul',
-                      {
-                        style: 'padding-left: 20px; margin: 4px 0;',
-                      },
-                      log.content.map((item) => h('li', {style: 'margin: 2px 0;'}, item))
-                  ),
-                ])
-            );
-          },
-        }
-    ),
-  ];
-  descriptionNodes.push(
-      h(
-          Collapse,
-          {
-            accordion: true,
-            class: 'announcement-collapse', // 添加类名
-            style: 'margin-bottom: 8px;',
-          },
-          {
-            default: () => collapsePanels,
-          }
-      )
+
+  const versionHistoryNodes = announcement.updateLog[lang].map((log) =>
+      h('div', {style: 'margin-bottom: 8px;'}, [
+        h('strong', `${log.version} - ${log.date}`),
+        log.url
+            ? h(
+                'a',
+                {
+                  href: log.url,
+                  target: '_blank',
+                  style: 'margin-left: 10px; color: #1890ff;',
+                },
+                t('VIEW_DETAILS') // "View Details" text
+            )
+            : null,
+      ])
   );
-  // 显示通知
+
+  descriptionNodes.push(
+      h('div', [
+        h('div', {style: 'font-weight: bold; margin-bottom: 8px;'}, t('VERSION_HISTORY')),
+        ...versionHistoryNodes,
+      ])
+  );
+
   notification.open({
     message: null,
     description: h('div', descriptionNodes),
@@ -1100,10 +1097,11 @@ function showAnnouncement() {
       localStorage.setItem('announcementShown', 'true');
     },
     style: {
-      width: '350px', // 调整通知的宽度
+      width: '350px',
     },
   });
 }
+
 
 // 清除表单
 const clearForm = () => {
@@ -1116,7 +1114,6 @@ const clearForm = () => {
 };
 
 const handleSubmit = () => {
-  console.log('表单提交');
 };
 
 // 获取模型列表
@@ -1254,9 +1251,12 @@ async function testModels() {
 
   const apiUrlValue = apiUrl.value.replace(/\/+$/, '');
   const apiKeyValue = apiKey.value;
-  const modelNames = selectedModels.value;
   const timeout = parseInt(modelTimeout.value);
   const concurrency = parseInt(modelConcurrency.value);
+  let inputModels = modelName.value.split(',').map((name) => name.trim()).filter((name) => name !== '');
+  let selectedModelNames = selectedModels.value;
+
+  const modelNames = Array.from(new Set([...inputModels, ...selectedModelNames]));
 
   if (modelNames.length === 0) {
     message.error('请输入至少一个模型名称或从列表中选择模型');
@@ -1969,8 +1969,6 @@ function normalizeUrl(url) {
 
 // 处理云端登录
 async function handleCloudLogin() {
-  console.log('cloudUrl:', cloudUrl.value);
-  console.log('cloudPassword:', cloudPassword.value);
   if (!cloudUrl.value || !cloudPassword.value) {
     message.error(t('PLEASE_ENTER_CLOUD_URL_AND_PASSWORD'));
     return;
@@ -2311,6 +2309,17 @@ function copyModels(type) {
   justify-content: center;
   color: var(--font-color);
   transition: color 0.3s;
+  cursor: pointer;
+}
+
+.icon-button.disabled-icon {
+  pointer-events: none; /* 禁用点击 */
+  opacity: 0.5; /* 调整透明度，表示禁用状态 */
+  cursor: not-allowed; /* 光标为禁用状态 */
+}
+
+.icon-button:hover:not(.disabled-icon) {
+  color: #0366d6;
 }
 
 .icon-button:hover {
@@ -3253,6 +3262,7 @@ body.light-mode {
   max-height: 70vh;
   overflow-y: auto;
 }
+
 .ant-list-item {
   min-height: 80px; /* 根据需要调整 */
 }
@@ -3269,6 +3279,19 @@ body.light-mode {
 .ant-list::-webkit-scrollbar-thumb {
   background-color: rgba(0, 0, 0, 0.2);
   border-radius: 3px;
+}
+
+.announcement-popup strong {
+  font-size: 14px;
+}
+
+.announcement-popup a {
+  color: #1890ff;
+  text-decoration: none;
+}
+
+.announcement-popup a:hover {
+  text-decoration: underline;
 }
 
 </style>
