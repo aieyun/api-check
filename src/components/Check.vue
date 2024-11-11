@@ -978,7 +978,7 @@ const showSettingsModal = () => {
 
   const messageContent = `
         <div>
-          <p><strong>已填入预制设置</strong></p>
+          <p><strong>已填入预设配置</strong></p>
           <div>🔑 密钥: ${skMasked}</div>
           <div>🔗 接口地址: ${apiUrl.value}</div>
           <div>📦 模型: ${modelName.value}</div>
@@ -988,7 +988,7 @@ const showSettingsModal = () => {
       `;
 
   Modal.info({
-    title: '预制设置',
+    title: '预设配置',
     content: h('div', {innerHTML: messageContent}),
     width: 400,
     centered: true,
